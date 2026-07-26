@@ -1,0 +1,54 @@
+{
+  "name": "spectre-pipeline",
+  "version": "1.0.0",
+  "description": "SPECTRE Training Data Pipeline - Generate synthetic training data for tactical AI",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "concurrently \"react-scripts start\" \"wait-on http://localhost:3000 && electron .\"",
+    "react": "react-scripts start",
+    "electron": "electron .",
+    "build-react": "react-scripts build",
+    "build": "npm run build-react && electron-builder",
+    "build-win": "npm run build-react && electron-builder --win",
+    "postinstall": "cd backend && pip install -r requirements.txt"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "cross-env": "^7.0.3",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0",
+    "react-scripts": "^5.0.1",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.spectre.pipeline",
+    "productName": "SPECTRE Pipeline",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "build/**/*",
+      "electron/**/*",
+      "backend/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend"
+      }
+    ]
+  }
+}
