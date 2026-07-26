@@ -51,7 +51,8 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:3000');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    mainWindow.loadFile(path.join(__dirname, '..', 'build', 'index.html'));
+    const buildPath = path.join(process.resourcesPath || __dirname, 'build', 'index.html');
+    mainWindow.loadFile(buildPath);
   }
 
   mainWindow.on('closed', () => {
