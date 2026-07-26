@@ -8,11 +8,11 @@ import json
 import os
 from pathlib import Path
 
-# Add the pipeline scripts to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "spectre-fixed" / "scripts"))
+# Add the backend directory to path for local pipeline imports
+sys.path.insert(0, str(Path(__file__).parent))
 
 from pipeline.config import validate_config, OPENROUTER_API_KEY, TEACHER_MODEL, JUDGE_A_MODEL, JUDGE_B_MODEL
-from pipeline.db import init_db, get_stats, get_db
+from pipeline.db import init_db, get_stats, get_db, insert_example
 from pipeline.sampler import generate_batch
 from pipeline.teacher import generate_batch as generate_teacher_batch
 from pipeline.geo_filter import run_geo_filter
@@ -71,13 +71,21 @@ def handle_start(config):
 
     # Stage 1: Sample
     send_log("Stage 1: Sampling scenarios...")
-    scenarios = generate_batch(100)
+    target = int(os.environ.get("TARGET_EXAMPLES", "1000"))
     conn = get_db()
-    for scenario in scenarios:
-        from pipeline.db import insert_example
-        insert_example(conn, scenario["scenario_params"], scenario["state_json"])
+    from pipeline.db import insert_example, get_stats
+    current = get_stats(conn)["total"]
     conn.close()
-    send_log(f"Sampled {len(scenarios)} scenarios")
+    sample_count = min(100, max(0, target - current))
+    if sample_count <= 0:
+        send_log(f"Already have {current} examples (target: {target}). Skipping sample.")
+    else:
+        scenarios = generate_batch(sample_count)
+        conn = get_db()
+        for scenario in scenarios:
+            insert_example(conn, scenario["scenario_params"], scenario["state_json"])
+        conn.close()
+        send_log(f"Sampled {len(scenarios)} scenarios")
     send_status()
 
     # Stage 2: Teacher
@@ -130,7 +138,6 @@ def handle_run_stage(stage, count):
             scenarios = generate_batch(count or 10)
             conn = get_db()
             for scenario in scenarios:
-                from pipeline.db import insert_example
                 insert_example(conn, scenario["scenario_params"], scenario["state_json"])
             conn.close()
             send_log(f"Sampled {len(scenarios)} scenarios")

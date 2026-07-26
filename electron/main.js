@@ -128,8 +128,15 @@ function killPythonProcess() {
 function sendToPython(command) {
   if (!pythonProcess) {
     startPythonProcess();
+    // Give the Python process a moment to initialize
+    setTimeout(() => {
+      if (pythonProcess && pythonProcess.stdin.writable) {
+        pythonProcess.stdin.write(JSON.stringify(command) + '\n');
+      }
+    }, 500);
+  } else if (pythonProcess.stdin.writable) {
+    pythonProcess.stdin.write(JSON.stringify(command) + '\n');
   }
-  pythonProcess.stdin.write(JSON.stringify(command) + '\n');
 }
 
 // IPC Handlers

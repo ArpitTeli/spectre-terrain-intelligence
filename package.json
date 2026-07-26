@@ -1,6 +1,6 @@
 {
   "name": "spectre-pipeline",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "SPECTRE Training Data Pipeline - Generate synthetic training data for tactical AI",
   "main": "electron/main.js",
   "scripts": {
@@ -9,8 +9,7 @@
     "electron": "electron .",
     "build-react": "react-scripts build",
     "build": "npm run build-react && electron-builder",
-    "build-win": "npm run build-react && electron-builder --win",
-    "postinstall": "cd backend && pip install -r requirements.txt"
+    "build-win": "npm run build-react && electron-builder --win"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -27,15 +26,18 @@
   "build": {
     "appId": "com.spectre.pipeline",
     "productName": "SPECTRE Pipeline",
+    "extends": null,
     "directories": {
       "output": "dist"
     },
     "files": [
-      "build/**/*",
       "electron/**/*",
       "backend/**/*",
       "node_modules/**/*"
     ],
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
     "win": {
       "target": "nsis",
       "icon": "build/icon.ico"
@@ -46,9 +48,25 @@
     },
     "extraResources": [
       {
+        "from": "build",
+        "to": "build"
+      },
+      {
         "from": "backend",
         "to": "backend"
       }
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
     ]
   }
 }
