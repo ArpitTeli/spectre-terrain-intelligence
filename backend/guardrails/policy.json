@@ -1,0 +1,143 @@
+{
+  "policy_version": "2.0.0",
+  "coord_min": 1000,
+  "coord_max": 7000,
+  "confidence_min": 0.6,
+  "confidence_max": 1.0,
+  "zone_radius_min": 150,
+  "zone_radius_max": 300,
+  "anchors_min": 2,
+  "anchors_max": 5,
+  "reasoning_min_chars": 40,
+  "reasoning_keys": [
+    "situation_assessment",
+    "tactical_choice",
+    "tradeoffs",
+    "what_if_rejected"
+  ],
+  "objectives": [
+    "attack",
+    "defend",
+    "evacuate",
+    "hold",
+    "patrol",
+    "recon",
+    "support"
+  ],
+  "intents": [
+    "attack",
+    "defend",
+    "evacuate",
+    "hold",
+    "move",
+    "recon",
+    "support"
+  ],
+  "prefer_surfaces": [
+    "road",
+    "forest",
+    null
+  ],
+  "engagement_radii": {
+    "mbt": 1200,
+    "ifv": 800,
+    "apc": 600,
+    "mrap": 500,
+    "light": 400,
+    "truck": 300,
+    "infantry": 300,
+    "helicopter": 1500
+  },
+  "friendly_reach": {
+    "mbt": 1200,
+    "ifv": 800,
+    "apc": 600,
+    "mrap": 500,
+    "light": 400,
+    "infantry": 300,
+    "helicopter": 1500,
+    "truck": 0,
+    "spg": 700,
+    "spaa": 500,
+    "eng": 300
+  },
+  "reach_slack": 60,
+  "threat_points": {
+    "mbt": 5,
+    "ifv": 4,
+    "apc": 3.75,
+    "mrap": 3.2,
+    "light": 2.5,
+    "truck": 0.5,
+    "infantry": 1,
+    "helicopter": 5
+  },
+  "forces_high": [
+    "mbt",
+    "ifv",
+    "helicopter"
+  ],
+  "threat_high_min": 9,
+  "threat_med_min": 4,
+  "vulnerable_to": {
+    "mbt": [
+      "apc",
+      "mrap",
+      "light",
+      "truck",
+      "spg",
+      "spaa",
+      "eng",
+      "infantry"
+    ],
+    "ifv": [
+      "apc",
+      "mrap",
+      "light",
+      "truck",
+      "spg",
+      "spaa",
+      "eng",
+      "infantry"
+    ],
+    "apc": [
+      "mrap",
+      "light",
+      "truck",
+      "spg",
+      "spaa",
+      "eng",
+      "infantry"
+    ],
+    "mrap": [
+      "light",
+      "truck",
+      "spg",
+      "spaa",
+      "eng",
+      "infantry"
+    ],
+    "light": [
+      "truck",
+      "spg",
+      "spaa",
+      "eng",
+      "infantry"
+    ],
+    "truck": [],
+    "infantry": [
+      "mrap",
+      "light",
+      "truck",
+      "spg",
+      "spaa",
+      "eng"
+    ]
+  },
+  "non_engaging_types": [
+    "eng",
+    "spaa",
+    "spg",
+    "truck"
+  ]
+}
