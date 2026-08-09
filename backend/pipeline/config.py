@@ -8,26 +8,19 @@ import os
 from pathlib import Path
 
 # Try to load from .env file if python-dotenv is available
-# Look for .env in the backend directory, then the app root
 try:
     from dotenv import load_dotenv
-    backend_dir = Path(__file__).parent
-    app_root = backend_dir.parent
-    # Try backend/.env first, then app root .env
-    for env_path in [backend_dir / ".env", app_root / ".env"]:
-        if env_path.exists():
-            load_dotenv(env_path)
-            break
+    load_dotenv(Path(__file__).parent.parent.parent / ".env")
 except ImportError:
     pass
 
 # API Keys (from environment variables)
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# Model selection (OpenRouter format: provider/model)
-TEACHER_MODEL = os.getenv("TEACHER_MODEL", "anthropic/claude-3.5-sonnet")
-JUDGE_A_MODEL = os.getenv("JUDGE_A_MODEL", "anthropic/claude-3.5-haiku")
-JUDGE_B_MODEL = os.getenv("JUDGE_B_MODEL", "openai/gpt-4o-mini")
+# Model selection
+TEACHER_MODEL = os.getenv("TEACHER_MODEL", "kimi-k3")
+JUDGE_MODEL = os.getenv("JUDGE_MODEL", "gemini-2.5-pro")
 
 # Pipeline settings
 TARGET_EXAMPLES = int(os.getenv("TARGET_EXAMPLES", "1000"))
@@ -39,8 +32,8 @@ MAX_RETRIES = 3
 BATCH_SIZE = 10  # examples per API batch call
 
 # Paths
-SCRIPTS_DIR = Path(__file__).parent
-MAPS_DIR = SCRIPTS_DIR.parent.parent / "public" / "maps"
+SCRIPTS_DIR = Path(__file__).parent.parent
+MAPS_DIR = SCRIPTS_DIR.parent / "public" / "maps"
 
 # Unit types available in the system
 UNIT_TYPES = [
@@ -50,7 +43,7 @@ UNIT_TYPES = [
 ]
 
 # OpenRouter API settings
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://agentrouter.org/v1")
 
 # Validate API keys
 def validate_config():

@@ -1,258 +1,239 @@
-"""Dual judge system for tactical validation.
+"""Gemini judge for tactical validation.
 
-Two independent judges evaluate each example:
-- Judge A: checks tactical coherence (does the order make sense?)
-- Judge B: checks reasoning quality (is the logic sound?)
-
-Uses different providers via OpenRouter to avoid correlated blind spots.
+Single judge (Gemini 2.5 Pro) evaluates batches of orders.
+Supports batching 10 examples per request to stay within rate limits.
 """
 
 import json
 import time
-from typing import Dict, Any, Optional
+import re
+from typing import List, Dict
 
-from .config import (
-    JUDGE_A_MODEL, JUDGE_B_MODEL,
-    OPENROUTER_API_KEY, OPENROUTER_BASE_URL,
-    MAX_RETRIES
-)
+from .config import GEMINI_API_KEY, MAX_RETRIES
 
 
-JUDGE_PROMPT = """You are a tactical validation judge for Arma 3.
-Evaluate whether this order is tactically sound given the situation.
+JUDGE_PROMPT = """You are a tactical validation judge for Arma 3 military simulation.
 
-## Situation
-{state_json}
-
-## Order Under Evaluation
-{order_json}
-
-## Your Task
-Evaluate ONLY these two aspects:
+Evaluate each of the {count} orders below. For each order, assess:
 1. Tactical coherence: Does the order logically follow from the situation?
 2. Reasoning quality: Is the reasoning sound and internally consistent?
 
-## Output Format
-Return valid JSON:
-{{
-  "verdict": "accept" | "reject",
-  "tactical_coherence": {{
-    "score": 1-10,
-    "issues": ["list of any issues"]
-  }},
-  "reasoning_quality": {{
-    "score": 1-10,
-    "issues": ["list of any issues"]
-  }},
-  "overall_assessment": "Brief explanation of your verdict"
-}}
-
 ## Rules
-- Do NOT evaluate spatial accuracy (that's handled separately)
-- Do NOT rewrite or suggest changes
-- Focus on tactical logic and reasoning consistency
 - Score below 6 on either aspect = reject
 - Both aspects must score 6+ to accept
-"""
+- Do NOT evaluate spatial accuracy (handled separately)
+- Do NOT rewrite or suggest changes
+
+## Examples to Evaluate
+{examples_json}
+
+## Output Format
+Return a JSON array with exactly {count} verdicts, one per example, in the same order:
+[
+  {{
+    "example_index": 0,
+    "verdict": "accept" | "reject",
+    "tactical_coherence": {{"score": 1-10, "issues": []}},
+    "reasoning_quality": {{"score": 1-10, "issues": []}},
+    "overall_assessment": "brief explanation"
+  }},
+  ...
+]
+
+Return ONLY the JSON array. No markdown, no explanation."""
 
 
-def call_openrouter_judge(prompt, model):
-    """Call OpenRouter API for judge."""
-    import httpx
-    
-    if not OPENROUTER_API_KEY:
-        raise ValueError("OPENROUTER_API_KEY not set")
-    
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/ArpitTeli/spectre-app",
-        "X-Title": "SPECTRE Training Pipeline"
-    }
-    
-    payload = {
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 1024,
-        "temperature": 0.3,  # Lower temperature for more consistent judging
-        "response_format": {"type": "json_object"}
-    }
-    
-    response = httpx.post(
-        f"{OPENROUTER_BASE_URL}/chat/completions",
-        headers=headers,
-        json=payload,
-        timeout=60.0
-    )
-    
-    if response.status_code != 200:
-        raise Exception(f"OpenRouter API error: {response.status_code} - {response.text}")
-    
-    return response.json()["choices"][0]["message"]["content"]
-
-
-def call_judge(prompt, model):
-    """Call judge via OpenRouter."""
-    return call_openrouter_judge(prompt, model)
-
-
-def evaluate_order(state_json, order_json, model):
-    """Evaluate a single order with a judge model.
-    
-    Returns:
-        dict: Judge verdict with scores and reasoning
-    """
-    prompt = JUDGE_PROMPT.format(
-        state_json=json.dumps(state_json, indent=2),
-        order_json=json.dumps(order_json, indent=2)
-    )
-    
-    for attempt in range(MAX_RETRIES):
+def extract_json(text):
+    """Extract JSON from a response that may contain markdown code blocks."""
+    match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', text, re.DOTALL)
+    if match:
+        text = match.group(1).strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    match = re.search(r'\[.*\]', text, re.DOTALL)
+    if match:
         try:
-            raw_response = call_judge(prompt, model)
-            verdict = json.loads(raw_response)
-            
-            # Validate structure
-            if "verdict" not in verdict:
-                raise ValueError("Response missing 'verdict'")
-            if verdict["verdict"] not in ["accept", "reject"]:
-                raise ValueError(f"Invalid verdict: {verdict['verdict']}")
-            
-            return verdict
-            
-        except json.JSONDecodeError as e:
-            print(f"JSON decode error on attempt {attempt + 1}: {e}")
-            if attempt == MAX_RETRIES - 1:
-                return {
-                    "verdict": "reject",
-                    "error": f"JSON decode failed: {e}"
-                }
-            time.sleep(1)
-            
-        except Exception as e:
-            print(f"API error on attempt {attempt + 1}: {e}")
-            if attempt == MAX_RETRIES - 1:
-                return {
-                    "verdict": "reject",
-                    "error": str(e)
-                }
-            time.sleep(2 ** attempt)
-    
-    return {"verdict": "reject", "error": "Max retries exceeded"}
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            pass
+    match = re.search(r'\{.*\}', text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            pass
+    raise json.JSONDecodeError("No valid JSON found", text, 0)
 
 
-def judge_example(example, judge_a_model=None, judge_b_model=None):
-    """Evaluate an example with both judges.
+def call_gemini(prompt):
+    """Call Gemini API."""
+    import httpx
+
+    if not GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY not set")
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={GEMINI_API_KEY}"
+
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.3,
+            "maxOutputTokens": 8192
+        }
+    }
+
+    response = httpx.post(url, json=payload, timeout=120.0)
+
+    if response.status_code != 200:
+        raise Exception(f"Gemini API error: {response.status_code} - {response.text}")
+
+    result = response.json()
+    content = result["candidates"][0]["content"]["parts"][0]["text"]
+    usage = result.get("usageMetadata", {})
+    return content, {
+        "prompt_tokens": usage.get("promptTokenCount", 0),
+        "completion_tokens": usage.get("candidatesTokenCount", 0),
+        "total_tokens": usage.get("totalTokenCount", 0)
+    }
+
+
+def build_batch_examples(examples_data):
+    """Build the examples section of the prompt for a batch."""
+    parts = []
+    for i, (state, orders) in enumerate(examples_data):
+        order_text = json.dumps(orders, indent=2)
+        parts.append(f"### Example {i}\n**Situation:** {json.dumps(state, indent=2)}\n**Orders:** {order_text}")
+    return "\n\n".join(parts)
+
+
+def judge_batch(examples_data):
+    """Judge a batch of examples in one API call.
     
     Args:
-        example: dict with state_json, teacher_output_json
-        judge_a_model: Override for judge A model
-        judge_b_model: Override for judge B model
+        examples_data: list of (state_json_dict, teacher_output_dict) tuples
     
     Returns:
-        tuple: (judge_a_verdict, judge_b_verdict)
+        list of verdict dicts
     """
+    count = len(examples_data)
+    examples_text = build_batch_examples(examples_data)
+    prompt = JUDGE_PROMPT.format(count=count, examples_json=examples_text)
+
+    for attempt in range(MAX_RETRIES):
+        try:
+            raw_response, usage = call_gemini(prompt)
+            verdicts = extract_json(raw_response)
+
+            # Handle single dict response
+            if isinstance(verdicts, dict):
+                verdicts = [verdicts]
+
+            # Validate count
+            if len(verdicts) != count:
+                raise ValueError(f"Expected {count} verdicts, got {len(verdicts)}")
+
+            for v in verdicts:
+                v["_usage"] = usage
+                if "verdict" not in v:
+                    raise ValueError(f"Verdict missing 'verdict' key")
+
+            return verdicts
+
+        except Exception as e:
+            print(f"Gemini judge error on attempt {attempt + 1}: {e}")
+            if attempt == MAX_RETRIES - 1:
+                return [{"verdict": "reject", "error": str(e)} for _ in range(count)]
+            time.sleep(2 ** attempt)
+
+    return [{"verdict": "reject", "error": "Max retries exceeded"} for _ in range(count)]
+
+
+def judge_single(example):
+    """Judge a single example (convenience wrapper)."""
     state = json.loads(example["state_json"]) if isinstance(example["state_json"], str) else example["state_json"]
     teacher_output = json.loads(example["teacher_output_json"]) if isinstance(example["teacher_output_json"], str) else example["teacher_output_json"]
-    
-    orders = teacher_output.get("orders", [])
-    
-    # Evaluate each order
-    all_verdicts_a = []
-    all_verdicts_b = []
-    
-    for order in orders:
-        # Judge A
-        verdict_a = evaluate_order(state, order, judge_a_model or JUDGE_A_MODEL)
-        all_verdicts_a.append(verdict_a)
-        
-        # Judge B
-        verdict_b = evaluate_order(state, order, judge_b_model or JUDGE_B_MODEL)
-        all_verdicts_b.append(verdict_b)
-    
-    # Aggregate verdicts
-    combined_a = {
-        "verdict": "accept" if all(v.get("verdict") == "accept" for v in all_verdicts_a) else "reject",
-        "order_verdicts": all_verdicts_a
-    }
-    
-    combined_b = {
-        "verdict": "accept" if all(v.get("verdict") == "accept" for v in all_verdicts_b) else "reject",
-        "order_verdicts": all_verdicts_b
-    }
-    
-    return combined_a, combined_b
+    verdicts = judge_batch([(state, teacher_output)])
+    return verdicts[0]
 
 
-def run_judges(batch_size=None):
-    """Run judges on all geo-filtered examples.
+def run_judges(batch_size=None, batch_api_size=10):
+    """Run Gemini judge on all pending examples.
+    
+    Groups examples into batches of batch_api_size for efficient API usage.
     
     Returns:
-        tuple: (accepted_count, rejected_count, flagged_count)
+        tuple: (accepted_count, rejected_count)
     """
     from .db import get_db, get_examples_by_status, update_judge_verdict
-    
+
     conn = get_db()
-    pending = get_examples_by_status(conn, "geo_passed")
-    
+    pending = get_examples_by_status(conn, "teacher_done")
+
     if batch_size:
         pending = pending[:batch_size]
-    
+
     accepted = 0
     rejected = 0
-    flagged = 0
-    
-    for example in pending:
-        example_id = example["id"]
-        
-        verdict_a, verdict_b = judge_example(example)
-        update_judge_verdict(conn, example_id, verdict_a, verdict_b)
-        
-        if verdict_a["verdict"] == "accept" and verdict_b["verdict"] == "accept":
-            accepted += 1
-        elif verdict_a["verdict"] == "reject" and verdict_b["verdict"] == "reject":
-            rejected += 1
-        else:
-            flagged += 1  # Disagreement
-    
+
+    # Process in batches
+    for i in range(0, len(pending), batch_api_size):
+        batch = pending[i:i + batch_api_size]
+        print(f"  Judging batch {i // batch_api_size + 1}: examples {i + 1}-{i + len(batch)}")
+
+        examples_data = []
+        for example in batch:
+            state = json.loads(example["state_json"])
+            teacher_output = json.loads(example["teacher_output_json"])
+            examples_data.append((state, teacher_output))
+
+        verdicts = judge_batch(examples_data)
+
+        for example, verdict in zip(batch, verdicts):
+            # Store verdict as both judge_a and judge_b (same model, single judge)
+            update_judge_verdict(conn, example["id"], verdict, verdict)
+
+            if verdict.get("verdict") == "accept":
+                accepted += 1
+            else:
+                rejected += 1
+
+        # Rate limit: 25 req/day for free tier
+        time.sleep(1)
+
     conn.close()
-    return accepted, rejected, flagged
+    return accepted, rejected
 
 
 if __name__ == "__main__":
-    # Test with sample data
-    sample_example = {
-        "state_json": {
-            "map": "stratis",
-            "objective": "attack",
-            "threat_level": "medium",
-            "friendly_units": [
-                {"unit_id": "friendly_0", "type": "mbt", "pos": [2592, 288], "status": "ready"}
-            ],
-            "known_contacts": [
-                {"contact_id": "enemy_0", "type": "ifv", "pos": [4000, 2000], "confidence": 0.9, "engagement_radius": 800}
-            ]
-        },
-        "teacher_output_json": {
-            "orders": [
-                {
-                    "unit_id": "friendly_0",
-                    "intent": "attack",
-                    "target": [4000, 2000],
-                    "anchors": [[3000, 1000], [3500, 1500]],
-                    "constraints": {},
-                    "reasoning": {
-                        "situation_assessment": "Enemy IFV at [4000, 2000]",
-                        "tactical_choice": "Attacking directly with MBT",
-                        "tradeoffs": "Could flank but direct attack maintains momentum",
-                        "what_if_rejected": "Flanking would take longer"
-                    }
-                }
-            ]
-        }
+    print("Testing Gemini judge...")
+    test_state = {
+        "map": "stratis",
+        "objective": "attack",
+        "threat_level": "medium",
+        "friendly_units": [
+            {"unit_id": "friendly_0", "type": "mbt", "pos": [2592, 288], "status": "ready"}
+        ],
+        "known_contacts": [
+            {"contact_id": "enemy_0", "type": "ifv", "pos": [4000, 2000], "confidence": 0.9, "engagement_radius": 800}
+        ]
     }
-    
-    print("Testing judge system...")
-    verdict_a, verdict_b = judge_example(sample_example)
-    print(f"Judge A: {verdict_a['verdict']}")
-    print(f"Judge B: {verdict_b['verdict']}")
+    test_orders = {
+        "orders": [{
+            "unit_id": "friendly_0",
+            "intent": "attack",
+            "target": [4000, 2000],
+            "anchors": [[3000, 1000], [3500, 1500]],
+            "constraints": {},
+            "reasoning": {
+                "situation_assessment": "Enemy IFV at [4000, 2000]",
+                "tactical_choice": "Attacking directly with MBT",
+                "tradeoffs": "Could flank but direct attack maintains momentum",
+                "what_if_rejected": "Flanking would take longer"
+            }
+        }]
+    }
+
+    verdict = judge_batch([(test_state, test_orders)])
+    print(json.dumps(verdict, indent=2))

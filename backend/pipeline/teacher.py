@@ -84,6 +84,28 @@ def format_prompt(state_json, terrain_digest_json=None):
     )
 
 
+def extract_json(text):
+    """Extract JSON from a response that may contain markdown code blocks."""
+    import re
+    # Try to find JSON in code blocks
+    match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', text, re.DOTALL)
+    if match:
+        text = match.group(1).strip()
+    # Try parsing directly
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    # Try finding first { ... } block
+    match = re.search(r'\{.*\}', text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            pass
+    raise json.JSONDecodeError("No valid JSON found", text, 0)
+
+
 def call_openrouter(prompt, model=None, max_tokens=4096):
     """Call OpenRouter API."""
     import httpx
@@ -104,8 +126,7 @@ def call_openrouter(prompt, model=None, max_tokens=4096):
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
-        "temperature": 0.7,
-        "response_format": {"type": "json_object"}
+        "temperature": 0.7
     }
     
     response = httpx.post(
@@ -139,7 +160,7 @@ def generate_teacher_output(state_json, terrain_digest_json=None, model=None):
             raw_response = call_teacher(prompt, model)
             
             # Parse JSON response
-            teacher_output = json.loads(raw_response)
+            teacher_output = extract_json(raw_response)
             
             # Validate basic structure
             if "orders" not in teacher_output:
