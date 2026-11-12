@@ -8,3 +8,5 @@ __pycache__/
 build/icon.ico
 .DS_Store
 Thumbs.db
+
+build/

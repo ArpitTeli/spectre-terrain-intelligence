@@ -21,8 +21,8 @@ function App() {
   const [config, setConfig] = useState({
     openrouterApiKey: '',
     teacherModel: 'anthropic/claude-3.5-sonnet',
-    judgeAModel: 'anthropic/claude-3.5-haiku',
-    judgeBModel: 'openai/gpt-4o-mini',
+    geminiApiKey: '',
+    judgeModel: 'gemini-2.5-pro',
     targetExamples: 1000,
     mapName: 'stratis'
   });
@@ -88,8 +88,8 @@ function App() {
         ...prev,
         openrouterApiKey: parsed.OPENROUTER_API_KEY || '',
         teacherModel: parsed.TEACHER_MODEL || prev.teacherModel,
-        judgeAModel: parsed.JUDGE_A_MODEL || prev.judgeAModel,
-        judgeBModel: parsed.JUDGE_B_MODEL || prev.judgeBModel,
+        geminiApiKey: parsed.GEMINI_API_KEY || '',
+        judgeModel: parsed.JUDGE_MODEL || prev.judgeModel,
         targetExamples: parseInt(parsed.TARGET_EXAMPLES) || prev.targetExamples,
         mapName: parsed.MAP_NAME || prev.mapName
       }));
@@ -101,8 +101,8 @@ function App() {
     const envContent = [
       `OPENROUTER_API_KEY=${config.openrouterApiKey}`,
       `TEACHER_MODEL=${config.teacherModel}`,
-      `JUDGE_A_MODEL=${config.judgeAModel}`,
-      `JUDGE_B_MODEL=${config.judgeBModel}`,
+      `GEMINI_API_KEY=${config.geminiApiKey}`,
+      `JUDGE_MODEL=${config.judgeModel}`,
       `TARGET_EXAMPLES=${config.targetExamples}`,
       `MAP_NAME=${config.mapName}`
     ].join('\n');

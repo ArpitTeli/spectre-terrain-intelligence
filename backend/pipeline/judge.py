@@ -5,11 +5,12 @@ Supports batching 10 examples per request to stay within rate limits.
 """
 
 import json
+import os
 import time
 import re
 from typing import List, Dict
 
-from .config import GEMINI_API_KEY, MAX_RETRIES
+from .config import GEMINI_API_KEY, JUDGE_MODEL, MAX_RETRIES
 
 
 JUDGE_PROMPT = """You are a tactical validation judge for Arma 3 military simulation.
@@ -71,10 +72,14 @@ def call_gemini(prompt):
     """Call Gemini API."""
     import httpx
 
-    if not GEMINI_API_KEY:
+    # Read at call time: the desktop app sets these after this module is imported.
+    api_key = os.getenv("GEMINI_API_KEY") or GEMINI_API_KEY
+    model = os.getenv("JUDGE_MODEL") or JUDGE_MODEL
+    if not api_key:
         raise ValueError("GEMINI_API_KEY not set")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={GEMINI_API_KEY}"
+    # Key goes in a header, not the URL, so it never lands in logs or tracebacks.
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -84,7 +89,7 @@ def call_gemini(prompt):
         }
     }
 
-    response = httpx.post(url, json=payload, timeout=120.0)
+    response = httpx.post(url, json=payload, headers={"x-goog-api-key": api_key}, timeout=120.0)
 
     if response.status_code != 200:
         raise Exception(f"Gemini API error: {response.status_code} - {response.text}")

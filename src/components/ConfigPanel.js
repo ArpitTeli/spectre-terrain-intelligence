@@ -45,6 +45,22 @@ function ConfigPanel({ config, setConfig, onSave }) {
             Get your key at <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">openrouter.ai/keys</a>
           </div>
         </div>
+
+        <div className="config__field">
+          <label className="config__label">GEMINI API KEY (JUDGE)</label>
+          <div className="config__input-group">
+            <input
+              className="config__input"
+              type={showKey ? 'text' : 'password'}
+              value={config.geminiApiKey}
+              onChange={(e) => handleChange('geminiApiKey', e.target.value)}
+              placeholder="AIza..."
+            />
+          </div>
+          <div className="config__hint">
+            Get your key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com/apikey</a>
+          </div>
+        </div>
       </div>
 
       <div className="config__section">
@@ -63,27 +79,15 @@ function ConfigPanel({ config, setConfig, onSave }) {
         </div>
 
         <div className="config__field">
-          <label className="config__label">JUDGE A MODEL</label>
+          <label className="config__label">JUDGE MODEL</label>
           <input
             className="config__input"
             type="text"
-            value={config.judgeAModel}
-            onChange={(e) => handleChange('judgeAModel', e.target.value)}
-            placeholder="anthropic/claude-3.5-haiku"
+            value={config.judgeModel}
+            onChange={(e) => handleChange('judgeModel', e.target.value)}
+            placeholder="gemini-2.5-pro"
           />
-          <div className="config__hint">First judge for tactical validation</div>
-        </div>
-
-        <div className="config__field">
-          <label className="config__label">JUDGE B MODEL</label>
-          <input
-            className="config__input"
-            type="text"
-            value={config.judgeBModel}
-            onChange={(e) => handleChange('judgeBModel', e.target.value)}
-            placeholder="openai/gpt-4o-mini"
-          />
-          <div className="config__hint">Second judge (different provider for independence)</div>
+          <div className="config__hint">Single Gemini judge for tactical validation (called directly, not via OpenRouter)</div>
         </div>
       </div>
 

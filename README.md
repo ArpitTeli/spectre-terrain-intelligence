@@ -92,7 +92,7 @@ Set in `.env` (see `.env.example`):
 |---|---|---|
 | `OPENROUTER_API_KEY` | (required) | Teacher model calls |
 | `GEMINI_API_KEY` | (required) | Judge calls |
-| `TEACHER_MODEL` | `kimi-k3` | Teacher model id |
+| `TEACHER_MODEL` | `anthropic/claude-3.5-sonnet` | Teacher model id (OpenRouter format). Chinese-origin models are rejected by `validate_config`. |
 | `JUDGE_MODEL` | `gemini-2.5-pro` | Judge model id |
 | `TARGET_EXAMPLES` | `1000` | Examples to generate |
 | `MAP_NAME` | `stratis` | Map used for scenarios |
@@ -118,11 +118,10 @@ Cost depends on the models you set. The old estimate of about $14 per 1,000 exam
 assumed three paid models (a teacher and two judges). The pipeline now uses one judge, so
 check your provider's current pricing for the two models you configure.
 
-## Known issues
+## Notes
 
-- `backend/pipeline_runner.py` still imports `JUDGE_A_MODEL` and `JUDGE_B_MODEL` from
-  `pipeline/config.py`, which now defines only `JUDGE_MODEL`. Fixing it needs a code change.
-- `build/` (a compiled React bundle) and `backend/pipeline/spectre_training.db` are tracked in git.
+- `build/` and `backend/pipeline/spectre_training.db` are no longer tracked (they are build output and local data).
+- Model names change often. If a default model is retired on OpenRouter, set `TEACHER_MODEL` in `.env`.
 
 ## License
 

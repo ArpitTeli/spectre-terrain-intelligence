@@ -11,7 +11,7 @@ from pathlib import Path
 # Add the backend directory to path for local pipeline imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from pipeline.config import validate_config, OPENROUTER_API_KEY, TEACHER_MODEL, JUDGE_A_MODEL, JUDGE_B_MODEL
+from pipeline.config import validate_config, OPENROUTER_API_KEY, TEACHER_MODEL, JUDGE_MODEL
 from pipeline.db import init_db, get_stats, get_db, insert_example
 from pipeline.sampler import generate_batch
 from pipeline.teacher import generate_batch as generate_teacher_batch
@@ -44,8 +44,9 @@ def handle_start(config):
     # Update config from Electron
     os.environ["OPENROUTER_API_KEY"] = config.get("openrouterApiKey", "")
     os.environ["TEACHER_MODEL"] = config.get("teacherModel", "anthropic/claude-3.5-sonnet")
-    os.environ["JUDGE_A_MODEL"] = config.get("judgeAModel", "anthropic/claude-3.5-haiku")
-    os.environ["JUDGE_B_MODEL"] = config.get("judgeBModel", "openai/gpt-4o-mini")
+    os.environ["JUDGE_MODEL"] = config.get("judgeModel", "gemini-2.5-pro")
+    if config.get("geminiApiKey"):
+        os.environ["GEMINI_API_KEY"] = config["geminiApiKey"]
     os.environ["TARGET_EXAMPLES"] = str(config.get("targetExamples", 1000))
     os.environ["MAP_NAME"] = config.get("mapName", "stratis")
 

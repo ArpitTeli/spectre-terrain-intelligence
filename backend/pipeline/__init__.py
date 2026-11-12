@@ -4,12 +4,12 @@ Generates synthetic training data for the tactical AI model.
 All models accessed via OpenRouter for unified billing.
 """
 
-from .config import validate_config, TEACHER_MODEL, JUDGE_A_MODEL, JUDGE_B_MODEL
+from .config import validate_config, TEACHER_MODEL, JUDGE_MODEL
 from .db import init_db, get_db, get_stats
 from .sampler import generate_scenario, generate_batch
 from .teacher import generate_teacher_output
 from .geo_filter import validate_example
-from .judge import judge_example
+from .judge import judge_single, judge_batch, run_judges
 from .resolver import resolve_verdict
 from .export import export_training_set
 
@@ -22,7 +22,9 @@ __all__ = [
     "generate_batch",
     "generate_teacher_output",
     "validate_example",
-    "judge_example",
+    "judge_single",
+    "judge_batch",
+    "run_judges",
     "resolve_verdict",
     "export_training_set",
 ]
